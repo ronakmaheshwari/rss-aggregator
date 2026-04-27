@@ -1,13 +1,17 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/ronakmaheshwari/rss-aggregator/internal/database"
 )
 
 type Status struct {
@@ -17,6 +21,10 @@ type Status struct {
 	ok bool
 }
 
+type apiConfig struct {
+	DB *database.Queries
+}
+
 func main() {
 	godotenv.Load()
 
@@ -24,7 +32,23 @@ func main() {
 	if port == "" {
 		log.Fatal(`Port must be set`)
 	}
-	
+
+	dbURL :=  os.Getenv("DB_URL");
+	if dbURL == "" {
+		log.Fatal(`Database URL must be set`)
+	}
+
+	conn, err := sql.Open("postgres", dbURL);
+	if err != nil {
+		log.Fatal(`Database URL issue couldnt connect`, err);
+	}
+
+	defer conn.Close();
+
+	apiConfig := apiConfig {
+		DB: database.New(conn),
+	}
+
 	router := chi.NewRouter();
 	v1Router := chi.NewRouter();
 
@@ -48,10 +72,13 @@ func main() {
 		w.Write([]byte("Hello World"))
 	})
 
-	router.Get("/healthz", healthController)
+	router.Get("/healthz", healthController);
+	v1Router.Post("/create", apiConfig.handlerCreateUser);
+	v1Router.Get("/users", apiConfig.getUsers);
 
 	fmt.Printf(`RSS Aggregator is running on http://localhost:%v`, port)
-	err := server.ListenAndServe()
+
+	err = server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
