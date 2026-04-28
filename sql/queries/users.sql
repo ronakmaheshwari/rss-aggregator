@@ -15,3 +15,6 @@ SET name = $1,
     updated_at = $2
 WHERE email = $3
 RETURNING id, name, email, created_at, updated_at;
+
+-- name: DeleteUser :exec
+DELETE FROM users WHERE email=$1;
