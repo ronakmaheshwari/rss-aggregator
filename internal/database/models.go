@@ -17,4 +17,5 @@ type User struct {
 	Email     string
 	CreatedAt time.Time
 	UpdatedAt sql.NullTime
+	ApiKey    string
 }

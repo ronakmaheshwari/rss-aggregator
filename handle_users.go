@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/ronakmaheshwari/rss-aggregator/internal/auth"
 	"github.com/ronakmaheshwari/rss-aggregator/internal/database"
 )
 
@@ -58,13 +59,30 @@ func (apiCfg *apiConfig) getUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (apiCfg *apiConfig) getUserByEmail(w http.ResponseWriter, r *http.Request) {
-	email := chi.URLParam(r, "email");
+	email := chi.URLParam(r, "email")
 	if email == "" {
 		http.Error(w, "email is required", http.StatusBadRequest)
 		return
 	}
 
 	user, err := apiCfg.DB.GetUserByEmail(r.Context(), email)
+	if err != nil {
+		w.WriteHeader(500)
+		w.Write([]byte(fmt.Sprintf("DB error: %v", err)))
+		return
+	}
+	respondWithJson(w, 200, user)
+}
+
+func (apiConfig *apiConfig) GetUserByApikey(w http.ResponseWriter, r *http.Request) {
+	api_key, err := auth.GetApiKey(r.Header)
+	if err != nil {
+		w.WriteHeader(401)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	
+	user, err := apiConfig.DB.GetUserByApikey(r.Context(), api_key)
 	if err != nil {
 		w.WriteHeader(500)
 		w.Write([]byte(fmt.Sprintf("DB error: %v", err)))

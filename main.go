@@ -76,6 +76,7 @@ func main() {
 	v1Router.Post("/create", apiConfig.handlerCreateUser);
 	v1Router.Get("/users", apiConfig.getUsers);
 	v1Router.Get("/users/{email}", apiConfig.getUserByEmail);
+	v1Router.Get("/users/apikey", apiConfig.GetUserByApikey);
 	v1Router.Patch("/", apiConfig.updateUser);
 	v1Router.Delete("/", apiConfig.deleteUser);
 

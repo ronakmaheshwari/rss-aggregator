@@ -14,9 +14,11 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, name, email, created_at, updated_at)
-VALUES ($1,$2,$3,$4,$5)
-RETURNING id, name, email, created_at, updated_at
+INSERT INTO users (id, name, email, created_at, updated_at, api_key)
+VALUES ($1,$2,$3,$4,$5,
+    encode(sha256(random()::text::bytea), 'hex')
+)
+RETURNING id, name, email, created_at, updated_at, api_key
 `
 
 type CreateUserParams struct {
@@ -42,6 +44,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ApiKey,
 	)
 	return i, err
 }
@@ -55,8 +58,26 @@ func (q *Queries) DeleteUser(ctx context.Context, email string) error {
 	return err
 }
 
+const getUserByApikey = `-- name: GetUserByApikey :one
+SELECT id, name, email, created_at, updated_at, api_key FROM users WHERE api_key = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserByApikey(ctx context.Context, apiKey string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByApikey, apiKey)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ApiKey,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, created_at, updated_at FROM users WHERE email = $1 LIMIT 1
+SELECT id, name, email, created_at, updated_at, api_key FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -68,12 +89,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ApiKey,
 	)
 	return i, err
 }
 
 const getUsers = `-- name: GetUsers :many
-SELECT id, name, email, created_at, updated_at FROM users
+SELECT id, name, email, created_at, updated_at, api_key FROM users
 `
 
 func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
@@ -91,6 +113,7 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 			&i.Email,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ApiKey,
 		); err != nil {
 			return nil, err
 		}
@@ -119,9 +142,17 @@ type UpdateUserParams struct {
 	Email     string
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+type UpdateUserRow struct {
+	ID        uuid.UUID
+	Name      string
+	Email     string
+	CreatedAt time.Time
+	UpdatedAt sql.NullTime
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
 	row := q.db.QueryRowContext(ctx, updateUser, arg.Name, arg.UpdatedAt, arg.Email)
-	var i User
+	var i UpdateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
